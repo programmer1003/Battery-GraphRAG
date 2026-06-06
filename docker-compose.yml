@@ -1,0 +1,28 @@
+version: '3.8'
+
+services:
+  # --------------------------------
+  # 核心服务 1：FastAPI 后端引擎
+  # --------------------------------
+  graphrag-backend:
+    build: .
+    container_name: battery-api-service
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env  # 安全挂载密码
+    command: uvicorn api_main:app --host 0.0.0.0 --port 8000
+
+  # --------------------------------
+  # 核心服务 2：Streamlit 前端网页
+  # --------------------------------
+  graphrag-frontend:
+    build: .
+    container_name: battery-ui-service
+    ports:
+      - "8501:8501"
+    env_file:
+      - .env
+    command: streamlit run app.py
+    depends_on:
+      - graphrag-backend # 保证先启动后端，再启动前端

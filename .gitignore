@@ -1,0 +1,14 @@
+# 忽略环境变量和机密信息
+.env
+Neo4j-*.txt
+
+# 忽略 Python 缓存文件
+__pycache__/
+*.pyc
+
+# 忽略临时 PDF 文件和本地测试数据
+temp.pdf
+*.csv
+
+# 忽略 Mac 系统文件 (如果你偶尔用 Mac)
+.DS_Store

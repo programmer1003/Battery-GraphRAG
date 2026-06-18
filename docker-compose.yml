@@ -2,7 +2,18 @@ version: '3.8'
 
 services:
   # --------------------------------
-  # 核心服务 1：FastAPI 后端引擎
+  # 核心服务 1：底层算法引擎 (TF-GDC)
+  # --------------------------------
+  algorithm-engine:
+    build: .
+    container_name: battery-algo-service
+    ports:
+      - "8001:8001"
+    # 算法引擎不需要密码，直接跑模型
+    command: uvicorn model_server:app --host 0.0.0.0 --port 8001
+
+  # --------------------------------
+  # 核心服务 2：Agent 网关与混合图谱大脑
   # --------------------------------
   graphrag-backend:
     build: .
@@ -10,19 +21,19 @@ services:
     ports:
       - "8000:8000"
     env_file:
-      - .env  # 安全挂载密码
+      - .env  # 挂载 Neo4j 和 DeepSeek 密钥
     command: uvicorn api_main:app --host 0.0.0.0 --port 8000
+    depends_on:
+      - algorithm-engine # 必须等底层算法引擎就绪，大脑才上线
 
   # --------------------------------
-  # 核心服务 2：Streamlit 前端网页
+  # 核心服务 3：Streamlit 流式前端大屏
   # --------------------------------
   graphrag-frontend:
     build: .
     container_name: battery-ui-service
     ports:
       - "8501:8501"
-    env_file:
-      - .env
-    command: streamlit run app.py
+    command: streamlit run app.py --server.address=0.0.0.0
     depends_on:
-      - graphrag-backend # 保证先启动后端，再启动前端
+      - graphrag-backend # 必须等大脑上线，前端才启动

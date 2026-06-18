@@ -1,71 +1,86 @@
-from neo4j import GraphDatabase
+# neo4j_client.py
+import asyncio
+from neo4j import AsyncGraphDatabase
 import logging
 import os
 from dotenv import load_dotenv
+from sentence_transformers import SentenceTransformer
+import logging
+# 强制把 neo4j 的通知级别提高到 ERROR，屏蔽所有恶心的黄字 Warning
+logging.getLogger("neo4j.notifications").setLevel(logging.ERROR)
 
-class Neo4jClient:
-    """Neo4j 数据库单例客户端"""
+
+class AsyncNeo4jClient:
+    """Neo4j 异步数据库单例客户端 (💥 工业级架构升级：原生 Vector Index 无状态版)"""
 
     def __init__(self, uri, user, password):
         try:
-            # 开启连接池
-            self.driver = GraphDatabase.driver(uri, auth=(user, password), max_connection_pool_size=50)
-            logging.info("成功连接至 Neo4j 数据库")
+            self.driver = AsyncGraphDatabase.driver(uri, auth=(user, password), max_connection_pool_size=50)
+            logging.info("✅ 成功连接至 Neo4j 异步数据库")
+
+            logging.info("🧠 正在加载 BGE 中文向量大模型，准备开启混合检索...")
+            self.embedding_model = SentenceTransformer('BAAI/bge-small-zh-v1.5')
+
+            # 💥 架构升级点：彻底抛弃了本地 node_cache 和 node_embeddings 缓存矩阵
+            # 实现了 Agent 微服务节点的真正 "无状态化(Stateless)"
+            logging.info("✅ 向量引擎挂载完毕，当前客户端处于无内存状态(Stateless)运行模式！")
+
         except Exception as e:
-            logging.error(f"Neo4j 连接失败: {e}")
+            logging.error(f"❌ 初始化失败: {e}")
 
-    def close(self):
+    async def close(self):
         if self.driver:
-            self.driver.close()
+            await self.driver.close()
+            logging.info("🔌 数据库连接已安全关闭")
 
-    def get_fault_subgraph(self, fault_name: str):
+    async def hybrid_search_subgraph(self, semantic_query: str):
         """
-        核心图查询逻辑：查询故障实体的上下文子图
-        使用参数化查询 ($fault_name) 防止注入攻击，并利用缓存加速
+        💥 核心 Hybrid RAG 逻辑：Top-K 算力下推！一次性召回前 3 个高优节点及其子图。
         """
+        query_vector = self.embedding_model.encode(semantic_query).tolist()
+
+        # 💥 核心修复：把 1 改成 3，扩大召回视野 (Top-K = 3)
         cypher_query = """
-        MATCH (f:Fault {name: $fault_name})
-        OPTIONAL MATCH (f)-[r1:HAS_SYMPTOM]->(s:Symptom)
-        OPTIONAL MATCH (f)-[r2:CAUSED_BY]->(c:RootCause)
-        RETURN f.name AS fault, 
-               collect(DISTINCT s.name) AS symptoms, 
-               collect(DISTINCT c.name) AS causes
+        CALL db.index.vector.queryNodes('entity_embeddings', 3, $query_vector)
+        YIELD node AS anchor, score
+        WHERE score >= 0.55
+        OPTIONAL MATCH (anchor)-[r]-(neighbor)
+        // 使用 WITH 聚合，按每个命中的核心节点打包它的邻居
+        WITH anchor, score, collect(DISTINCT {relation: type(r), neighbor: neighbor.name}) AS context
+        RETURN {
+            matched_node: anchor.name,
+            similarity_score: score,
+            graph_context: context
+        } AS result_dict
         """
-        with self.driver.session() as session:
-            result = session.run(cypher_query, fault_name=fault_name)
-            record = result.single()  # 我们只需要匹配到的那个核心节点的子图
 
-            if record:
-                return {
-                    "fault_node": record["fault"],
-                    "symptoms": record["symptoms"],
-                    "root_causes": record["causes"]
-                }
+        async with self.driver.session() as session:
+            result = await session.run(cypher_query, query_vector=query_vector)
+            # 💥 核心修复：不再只取 .single()，而是把前 3 个结果全部装进列表返回
+            records = await result.data()
+
+            if records:
+                # 提取出所有的 result_dict 组成一个列表
+                final_results = [record["result_dict"] for record in records if record["result_dict"]["matched_node"]]
+                if final_results:
+                    print(f"🎯 [Hybrid RAG] 视野扩大！成功命中 {len(final_results)} 个知识锚点！")
+                    return final_results
+
             return None
 
 
-
-# ==========================================
-# 👇 改造后的安全测试代码 👇
-# ==========================================
-if __name__ == "__main__":
-    # 强制加载 .env 文件中的密码
+# 👇 本地独立测试
+async def main():
     load_dotenv()
+    client = AsyncNeo4jClient(uri=os.getenv("NEO4J_URI"), user=os.getenv("NEO4J_USER"),
+                              password=os.getenv("NEO4J_PASSWORD"))
 
-    # 安全地从系统环境变量中读取配置
-    URI = os.getenv("NEO4J_URI")
-    USER = os.getenv("NEO4J_USER")
-    PASSWORD = os.getenv("NEO4J_PASSWORD")
+    print("\n🔍 测试 1：混合检索 (无状态架构版)...")
+    res = await client.hybrid_search_subgraph("电池内部好像长了小毛刺，导致漏电和压差变大了")
+    print(f"\n✅ 混合检索召回结果:\n{res}")
 
-    if not all([URI, USER, PASSWORD]):
-        print("❌ 错误：未能从 .env 文件中读取到完整的 Neo4j 凭证，请检查配置！")
-        exit()
+    await client.close()
 
-    print("🚀 正在跨网连接云端 GraphRAG 大脑，请稍候...")
 
-    # 实例化单例客户端
-    client = Neo4jClient(uri=URI, user=USER, password=PASSWORD)
-
-    print("\n🔍 正在测试底层查询通路...")
-    test_result = client.get_fault_subgraph("微短路故障")
-    print(f"✅ 测试查询结果: {test_result}")
+if __name__ == "__main__":
+    asyncio.run(main())

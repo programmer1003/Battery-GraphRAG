@@ -2,22 +2,6 @@
 
 ![Python](https://img.shields.io/badge/Python-3.10%2B-blue.svg)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.110%2B-009688.svg)
-![Docker](https://img.shields.io/badge/Docker-Ready-2496ED.svg)
-![Neo4j](https://img.shields.io/badge/Neo4j-AuraDB-008CC1.svg)
-![LLM](https://img.shields.io/badge/LLM-DeepSeek_API-brightgreen.svg)
-![Ragas](https://img.shields.io/badge/Eval-Ragas-FF5A5F.svg)
-
-**🚀 工业级智能体诊断引擎**：面向车企售后排障场景，结合 Agent 工具调用与知识图谱底座，解决大模型在垂直领域“多跳推理缺失”、“多模态长数据阻塞”及“诊断幻觉”等工程落地痛点。
-
-## 📖 项目简介 (Introduction)
-
-本项目独立研发了一套针对新能源动力电池的辅助诊断 Agent。系统摒弃了传统的单纯向量检索（Vector RAG），采用 **GraphRAG + Function Calling** 架构。
-
-系统不仅能够将非结构化的汽车《维修手册》转化为高维图谱，还能通过 Agent 调度底层的时序异常检测算法（TF-GDC），实现文本语义与物理底层波形数据的“联合会诊”。具备直接应用于汽车智能座舱或售后排障 Copilot 场景的工程潜力。
-# 🔋 动力电池故障诊断 Agent：基于知识图谱的 GraphRAG 系统
-
-![Python](https://img.shields.io/badge/Python-3.10%2B-blue.svg)
-![FastAPI](https://img.shields.io/badge/FastAPI-0.110%2B-009688.svg)
 ![Neo4j](https://img.shields.io/badge/Neo4j-AuraDB-008CC1.svg)
 ![LLM](https://img.shields.io/badge/LLM-DeepSeek_API-brightgreen.svg)
 ![Ragas](https://img.shields.io/badge/Eval-Ragas-FF5A5F.svg)
